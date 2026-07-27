@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,4 +48,68 @@ func TestCafeWhenOk(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, response.Code)
 	}
+}
+
+func TestCafeCount(t *testing.T) {
+	handler := http.HandlerFunc(mainHandle)
+
+	requests := []struct {
+		count int
+		want  int
+	}{
+		{0, 0},
+		{1, 1},
+		{2, 2},
+		{100, min(100, len(cafeList["moscow"]))},
+	}
+	for _, v := range requests {
+		response := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/cafe?city=moscow&count=%d", v.count), nil)
+
+		handler.ServeHTTP(response, req)
+
+		body := response.Body.String()
+		if body == "" {
+			assert.Equal(t, v.want, 0)
+		} else {
+			list := strings.Split(body, ",")
+			assert.Equal(t, v.want, len(list))
+		}
+
+	}
+}
+
+func TestCafeSearch(t *testing.T) {
+	handler := http.HandlerFunc(mainHandle)
+
+	requests := []struct {
+		search    string
+		wantCount int
+	}{
+		{"фасоль", 0},
+		{"кофе", 2},
+		{"вилка", 1},
+	}
+
+	for _, v := range requests {
+		response := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", fmt.Sprintf("/cafe?city=moscow&search=%s", v.search), nil)
+
+		handler.ServeHTTP(response, req)
+
+		body := response.Body.String()
+		if body == "" {
+			assert.Equal(t, v.wantCount, 0)
+		} else {
+			list := strings.Split(body, ",")
+			for _, cafeName := range list {
+				if v.search != "" {
+					assert.True(t, strings.Contains(strings.ToLower(cafeName), strings.ToLower(v.search)))
+				}
+			}
+			assert.Equal(t, v.wantCount, len(list))
+		}
+
+	}
+
 }
